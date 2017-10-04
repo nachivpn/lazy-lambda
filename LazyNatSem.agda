@@ -7,7 +7,6 @@ open import Data.Maybe
 open import Data.Vec
 
 
-
 data Var : Set where
   name : ℕ → Var
 
@@ -17,21 +16,30 @@ data Exp  : Set where
   var     : Var → Exp
   lEt_iN_ : List (Var × Exp) → Exp → Exp
 
-Heap : Set
-Heap = Var → Maybe Exp
-
 -- data Val : Exp →  Set where
 
-data _gives_ : Heap → Exp → Set where
+data Heap : Set where
 
-data _[[_/_]] : Exp → Var → Var → Set where
+data _has_ : Heap → Exp → Set where
+  _∶_ : (H : Heap) → (E : Exp) → H has E
 
--- data _⇓_ : _gives_ → _gives_ → Set where
---   app_red : {Γ Θ Δ : Heap} {x y z : Var} {e e' : Exp} → (Γ gives e) ⇓ (Δ gives (lambda y e')) → (Δ gives (e' [[ x / y ]])) ⇓ (Θ gives z) → (Γ gives (e ∙ x)) ⇓ (Θ gives z)
+-- data subst_With_In_ : Var → Var → Exp → Set where
+_[|_/_|] : (E : Exp) → (X Y : Var) → Exp
+_[|_/_|] = {!!}
 
---   -- lambda_red : 
+infix 30 _∶_
+infix 20 _⇓_
+infix 31 _[|_/_|]
 
-fun : ∀ {i} → Set i → Set i
-fun A = A → A
+data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ has E₁ → H₂ has E₂ → Set where
+   app_red : {Γ Θ Δ : Heap} {x y : Var} {e e' z : Exp} → Γ ∶ e ⇓ Δ ∶ lambda y e' → Δ ∶ e' [| x / y |] ⇓ Θ ∶ z → Γ ∶ (e ∙ x) ⇓ (Θ ∶ z)
+   lam_red : {Γ : Heap} → {x : Var} → {e : Exp} → Γ ∶ lambda x e ⇓ Γ ∶ lambda x e  
 
+{-
+-- TODO: 
+-- * Heap definition
+-- * Remaining constructors (variable and let) {depends on heap defn}
+-- * subst function
+-- * prove simply labda caluclus evaluation: id x == x
+-}
 
