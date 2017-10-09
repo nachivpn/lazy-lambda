@@ -1,14 +1,15 @@
 module LazyNatSem where
 
-open import Data.Nat
-open import Data.List
-open import Data.Product
-open import Data.Maybe
-open import Data.Vec
+open import Prelude.Bool
+open import Prelude.Nat
+open import Prelude.List
+open import Prelude.Product
+open import Prelude.Maybe
+open import Prelude.Vec
 
 
 data Var : Set where
-  name : ℕ → Var
+  name : Nat → Var
 
 data Exp  : Set where
   lambda  : Var → Exp → Exp
@@ -16,16 +17,27 @@ data Exp  : Set where
   var     : Var → Exp
   lEt_iN_ : List (Var × Exp) → Exp → Exp
 
--- data Val : Exp →  Set where
-
 data Heap : Set where
 
 data _has_ : Heap → Exp → Set where
   _∶_ : (H : Heap) → (E : Exp) → H has E
 
--- data subst_With_In_ : Var → Var → Exp → Set where
+
+_Var₌₌_ : Var → Var → Bool
+_Var₌₌_ (name x) (name x₁) = eqNat x x₁
+
+
+{-# NON_TERMINATING #-}
 _[|_/_|] : (E : Exp) → (X Y : Var) → Exp
-_[|_/_|] = {!!}
+lambda mvar mexp [| X / Y |] = if mvar Var₌₌ Y then lambda mvar mexp else lambda mvar (mexp [| X / Y |])
+(mexp ∙ xvar) [| X / Y |] = (mexp [| X / Y |]) ∙ (if (xvar Var₌₌ Y) then X else xvar)
+var mvar [| X / Y |] = if mvar Var₌₌ Y then var X else var mvar
+(lEt x iN E) [| X / Y |] = lEt (map (λ x₁ → if ((fst x₁) Var₌₌ Y) then x₁ else ((fst x₁) , ((snd x₁) [| X / Y |]))) x) iN (E [| X / Y |])
+
+tstExp1 : Exp
+tstExp1 = lambda (name 1) (((var (name 0)) ∙ ( (name 1))) ∙ ((name 2)))
+
+-- tstExp1 [| (name 1)  / (name 0) |]
 
 infix 30 _∶_
 infix 20 _⇓_
