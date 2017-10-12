@@ -11,8 +11,6 @@ data Exp  : Set where
   var     : Var → Exp
   lEt_iN_ : List (Var × Exp) → Exp → Exp
 
--- data Val : Exp →  Set where
-
 Heap : Set
 Heap = List (Var × Exp)
 
@@ -36,7 +34,6 @@ var*2 (name x₁) = name (x₁ * 2)
   renameList [] = []
   renameList ((v , snd₁) ∷ xs) = (( var*2 v , *2 snd₁)) ∷ xs
 
-
 -- Renaming function
 α_ : Exp → Exp
 α e = {!!}
@@ -52,8 +49,21 @@ var*2 (name x₁) = name (x₁ * 2)
 data _⊢_ : (H : Heap) (E : Exp) → Set where
   _∶_ : (H : Heap) → (E : Exp) → H ⊢ E
 
+_Var₌₌_ : Var → Var → Bool
+_Var₌₌_ (name x) (name x₁) = eqNat x x₁
+
+
+{-# NON_TERMINATING #-}
 _[|_/_|] : (E : Exp) → (X Y : Var) → Exp
-_[|_/_|] = {!!}
+lambda mvar mexp [| X / Y |] = if mvar Var₌₌ Y then lambda mvar mexp else lambda mvar (mexp [| X / Y |])
+(mexp ∙ xvar) [| X / Y |] = (mexp [| X / Y |]) ∙ (if (xvar Var₌₌ Y) then X else xvar)
+var mvar [| X / Y |] = if mvar Var₌₌ Y then var X else var mvar
+(lEt x iN E) [| X / Y |] = lEt (map (λ x₁ → if ((fst x₁) Var₌₌ Y) then x₁ else ((fst x₁) , ((snd x₁) [| X / Y |]))) x) iN (E [| X / Y |])
+
+tstExp1 : Exp
+tstExp1 = lambda (name 1) (((var (name 0)) ∙ ( (name 1))) ∙ ((name 2)))
+
+-- tstExp1 [| (name 1)  / (name 0) |]
 
 infix 21 _∶_
 infix 20 _⇓_
