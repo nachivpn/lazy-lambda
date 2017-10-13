@@ -73,9 +73,9 @@ z = (name 3)
 w = (name 4)
 
 
-testα : UExp
-testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
 
+testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
+testα2 = (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))
 
 stack = List Var
 vlookup = List (Var × Nat)
@@ -106,12 +106,16 @@ count-vars (x₁ u∙ x₂) = count-vars x₁ + count-vars x₂
 count-vars uvar x₁ = 1
 
 α-rename : UExp → Nat → (List (Var × Nat)) → (UExp × (List (Var × Nat)))
-α-rename (ulambda x₂ x₃) cc lkup = {!!}
+α-rename (ulambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
+... | newexp , newlkup with x₂ lookupvn newlkup
+... | nothing = (ulambda (name cc) newexp) , newlkup
+... | just x₁ = (ulambda (name x₁) newexp) , (remove x₂ from newlkup)
 α-rename (x₂ u∙ x₃) cc lkup  with count-vars x₂
 ... | t with α-rename x₃ (t + cc) lkup
-... | w = {!!}
+... | newexp , newlkup with α-rename x₂ cc newlkup
+... | newexp2 , newlkup2 = (newexp2 u∙ newexp) , newlkup2
 α-rename (uvar (name x₂)) cc lkup with name x₂ lookupvn lkup
-... | nothing = (uvar (name (x₂ + cc))) , ((name x₂ , x₂ + cc) ∷ lkup)
+... | nothing = (uvar (name (cc))) , ((name x₂ ,  cc) ∷ lkup)
 ... | just x₁ = (uvar (name x₁)) , lkup
 
 {-# NON_TERMINATING #-}
