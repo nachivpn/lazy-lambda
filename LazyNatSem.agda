@@ -15,7 +15,6 @@ data UExp  : Set where
   ulambda  : Var → UExp → UExp
   _u∙_     : UExp → UExp → UExp
   uvar     : Var → UExp
-  ulEt_iN_ : List (Var × UExp) → UExp → UExp
 
 
 data Exp  : Set where
@@ -57,10 +56,6 @@ umax : UExp → Nat
 umax (ulambda x x₁) = max (umax x₁) (unname x)
 umax (x u∙ x₁) = max (umax x) (umax x₁)
 umax (uvar x) = unname x
-umax (ulEt x iN x₁) with usplit x
-... | t with foldN 0 (map umax (snd t))
-... | w with foldN 0 (map unname (fst t))
-... | q = max w q
 
 {-# NON_TERMINATING #-}
 emax : Exp → Nat
@@ -79,7 +74,7 @@ w = (name 4)
 
 
 testα : UExp
-testα = (uvar y) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
+testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
 
 
 stack = List Var
@@ -101,33 +96,28 @@ pop_ : List (Var) → List (Var)
 pop [] = []
 pop (x₁ ∷ x₂) = x₂
 
-α-rename : UExp → stack × vlookup  → UExp × (stack × vlookup)
-α-rename (ulambda x₂ x₃) x₁ with α-rename x₃ ((x₂ ∷ fst x₁) , (snd x₁))
-... | (a , ( b , c )) with (x₂ lookupvn c)
-... | nothing = ulambda (name (length b)) a , ((pop b) , c)
-... | just x₄ = ulambda (name x₄) a , (b , (remove x₂ from c))
-α-rename (x₂ u∙ x₃) x₁ = {!!}
-α-rename (uvar x₂) x₁ with (x₂ lookupvn snd x₁)
-... | nothing = (uvar (name (length (fst x₁)))) , ((pop (fst x₁)) , (x₂ , (length (fst x₁))) ∷ (snd x₁))
-... | just x₃ = (uvar (name x₃)) , ((pop (fst x₁)) , (snd x₁))
-α-rename (ulEt x₂ iN x₃) x₁ = {!!}
--- α-rename : Exp → stack × vlookup  → Exp × (stack × vlookup)
--- α-rename (lambda x₂ x₃) x₁ with α-rename x₃ ((x₂ ∷ fst x₁) , (snd x₁))
--- ... | (a , ( b , c )) with (x₂ lookupvn c)
--- ... | nothing = lambda (name (length b)) a , ((pop b) , c)
--- ... | just x₄ = lambda (name x₄) a , (b , (remove x₂ from c))
--- α-rename (x₂ ∙ x₃) x₁ = {!!}
--- α-rename (var x₂) x₁ with (x₂ lookupvn snd x₁)
--- ... | nothing = (var (name (length (fst x₁)))) , ((pop (fst x₁)) , (x₂ , (length (fst x₁))) ∷ (snd x₁))
--- ... | just x₃ = (var (name x₃)) , ((pop (fst x₁)) , (snd x₁))
--- α-rename (lEt x₂ iN x₃) x₁ = {!!}
+_stack-append_ : stack → stack → stack
+_stack-append_ [] x₁ = x₁
+_stack-append_ (x₂ ∷ x₃) x₁ = x₂ ∷ (x₃ stack-append x₁)
 
+count-vars_ : UExp → Nat
+count-vars ulambda x₁ x₂ = 1 + count-vars x₂
+count-vars (x₁ u∙ x₂) = count-vars x₁ + count-vars x₂
+count-vars uvar x₁ = 1
+
+α-rename : UExp → Nat → (List (Var × Nat)) → (UExp × (List (Var × Nat)))
+α-rename (ulambda x₂ x₃) cc lkup = {!!}
+α-rename (x₂ u∙ x₃) cc lkup  with count-vars x₂
+... | t with α-rename x₃ (t + cc) lkup
+... | w = {!!}
+α-rename (uvar (name x₂)) cc lkup with name x₂ lookupvn lkup
+... | nothing = (uvar (name (x₂ + cc))) , ((name x₂ , x₂ + cc) ∷ lkup)
+... | just x₁ = (uvar (name x₁)) , lkup
 
 {-# NON_TERMINATING #-}
 starTransform : UExp → Exp
 starTransform (ulambda x x₁) = lambda x (starTransform x₁)
 starTransform (uvar x) = var x
-starTransform (ulEt x iN x₁) = lEt (map (λ x₂ → (fst x₂) , starTransform (snd x₂)) x) iN starTransform x₁
 starTransform (e₁ u∙ uvar x) = starTransform e₁ ∙ x
 starTransform (e₁ u∙ e₂) = lEt (name (suc (max (umax e₂) (umax e₁))) , (starTransform e₂)) ∷ [] iN (starTransform e₁ ∙ name ((suc (max (umax e₂) (umax e₁)))))
 
