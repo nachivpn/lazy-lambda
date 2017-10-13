@@ -60,18 +60,21 @@ data _∈v_ {A : Set} : {n : Nat} (x : A) → Vec A n → Set where
 -- scope sensitive belongs
 -- Unlike ∈, it does not allow scope insensitive proof of belongs
 _∈s_ : (Name × Pointer) → Env → Set
-np ∈s [] = ⊥
-np ∈s (np' ∷ ρ') with np == np' 
-... | yes refl = ⊤
-... | no _     = np ∈s ρ'
+(n , p) ∈s [] = ⊥
+(n , p) ∈s ((n' , p') ∷ ρ') with n == n' 
+... | no _     = (n , p) ∈s ρ'
+... | yes refl with p == p'
+(n , p) ∈s ((.n , p') ∷ ρ') | yes refl | (yes x₁) = ⊤
+(n , p) ∈s ((.n , p') ∷ ρ') | yes refl | (no x₁) = ⊥
+
 
 -- indexed "belongs to"
-_∈i_!_ : {n : Nat} → Closure → Heap n → Nat → Set
-c ∈i H ! n = {!!}
+⊢_∈i_!_ : {n : Nat} → Closure → Heap n → Nat → Set
+⊢ c ∈i H ! n = {!!}
 
 private
   env : Env
-  env = ("x", 1) ∷ ("z", 0) ∷( "x" , 0 ) ∷ []
+  env = ("y", 5) ∷ ("x", 1) ∷ ("z", 0) ∷( "x" , 0 ) ∷ []
 
   p₁ : ("x" , 1) ∈s env
   p₁ = tt
@@ -93,7 +96,7 @@ data _⇓_ :  ∀ {m n} → Heap m ⊢ Closure → Heap n ⊢ Closure → Set wh
   var-red : ∀ { x ρ tc vc} {p : Pointer}
    {n n' : Nat} {H : Heap n} {H' : Heap n'} { fp : Fin n }
    → (x , p) ∈s ρ
-   → tc ∈i H ! p
+   → ⊢ tc ∈i H ! p
    → H ∶ tc ⇓ H' ∶ vc
    → H ∶ var x ⟨ ρ ⟩ ⇓ (vc ∷ H') ∶ vc
   
