@@ -1,10 +1,9 @@
 module Term where
 
 open import Prelude
-open import Data.Nat
 open import Tactic.Deriving.Eq
 
-Name = String
+Name = Nat
 Pointer = Nat
 
 data Term : Set where
@@ -43,7 +42,13 @@ _∣_↦_∣ : {A B : Set} → List (A × B) → A → B → List (A × B)
 L ∣ a ↦ b ∣ = ( a , b ) ∷ L
 
 x : Nat
-x = 0
+x = 1
+
+y : Nat
+y = 2
+
+z : Nat
+z = 3
 
 infix 10 _⇓_
 infix 18 _∶_
@@ -51,49 +56,53 @@ infix 21 _⊢_
 infix 21 _∣_↦_∣
 infix 23 _⟨_⟩
 
-
 -- constructive "belongs to" for vectors
-data _∈v_ {A : Set} : {n : Nat} (x : A) → Vec A n → Set where
-  zero : {m : Nat} {x : A} {xs : Vec A m}
+data _∈v_ {A : Set} (x : A): {n : Nat} → Vec A n → Set where
+  zero : {m : Nat} {xs : Vec A m}
     → x ∈v (x ∷ xs)
-  suc  : {m : Nat} {x y : A} {xs : Vec A m}
+  suc  : {m : Nat} {y : A} {xs : Vec A m}
     → (x ∈v xs) → x ∈v (y ∷ xs)
+
+_==n_ : Nat → Nat → Bool
+zero ==n zero = true
+zero ==n suc n = false
+suc m ==n zero = false
+suc m ==n suc n = m ==n n
 
 -- scope sensitive belongs
 -- Unlike ∈, it does not allow scope insensitive proof of belongs
 _∈s_ : (Name × Pointer) → Env → Set
 (n , p) ∈s [] = ⊥
-(n , p) ∈s ((n' , p') ∷ ρ') with n == n' 
-... | no _     = (n , p) ∈s ρ'
-... | yes refl with p == p'
-(n , p) ∈s ((.n , p') ∷ ρ') | yes refl | yes _ = ⊤
-(n , p) ∈s ((.n , p') ∷ ρ') | yes refl | no _ = ⊥
-
+(n , p) ∈s ((n' , p') ∷ ρ') with n ==n n' | p ==n p'
+... | false | _     = ( n , p ) ∈s ρ'
+... | _     | false = ⊥
+... | true  | true  = ⊤
 
 postulate
   <_post₁ : (m n : Nat) → IsTrue (lessNat m n) → IsTrue (lessNat (n - m - 1) n)
-  update-post : ∀ {n ρ} → ( "x" , n ) ∈s ρ ∣ "x" ↦ n ∣
+  update-post : ∀ {n ρ} → ( x , n ) ∈s ρ ∣ x ↦ n ∣
   n<sucn : ∀ {n} → IsTrue (lessNat n (suc n))
+  n==n : ∀ {n} → IsTrue (n ==n n)
 
 private
   env : Env
-  env = ("y", 5) ∷ ("x", 1) ∷ ("z", 0) ∷( "x" , 0 ) ∷ []
+  env = (y , 5) ∷ (x , 1) ∷ (z , 0) ∷(x , 0 ) ∷ []
 
-  p₁ : ("x" , 1) ∈s env
+  p₁ : (x , 1) ∈s env
   p₁ = tt
 
   -- this cannot be proved (◕‿◕)
-  -- p₂ :  ("x" , 0) ∈s env
+  -- p₂ :  (x , 0) ∈s env
   -- p₂ = {!!}
 
   H : Heap 2
-  H = (1 , var "y" ⟨ env ⟩) ∷ ( 0 , var ("x") ⟨ env ⟩) ∷ []
+  H = (1 , var y ⟨ env ⟩) ∷ ( 0 , var x ⟨ env ⟩) ∷ []
 
   -- p₃ : ∈heap H 0 (var "x" ⟨ env ⟩)
   -- p₃ = tt
 
   idf : Term
-  idf = lam "x" (var "x")
+  idf = lam x (var x)
 
 _[_]≔_ : ∀ {n} → Heap n → Nat → Closure → Heap n
 [] [ n ]≔ y = []
@@ -116,26 +125,26 @@ data _⇓_ :  ∀ {m n} → Heap m ⊢ Closure → Heap n ⊢ Closure → Set wh
    → (x , p) ∈s ρ
    → (p , tc) ∈v H
    → H ∶ tc ⇓ H' ∶ vc
-   → H ∶ var x ⟨ ρ ⟩ ⇓ ((p , vc) ∷ H') ∶ vc 
+   → H ∶ var x ⟨ ρ ⟩ ⇓ ((p , vc) ∷ H') ∶ vc -- this assumes ∈s access for correctness (TODO, currently ∈v) and GC for scpace
   
 
 idF : Term
-idF = lam "x" (var "x")
+idF = lam x (var x)
 
 id∙id⇓id : {n : Nat} {ρ : Env} {H : Heap n}
   → H ∶ (idF ∙ idF) ⟨ ρ ⟩ ⇓ ((n , idF ⟨ ρ ⟩) ∷ (n , idF ⟨ ρ ⟩) ∷ H) ∶ idF ⟨ ρ ⟩
 id∙id⇓id {n} {ρ} {H} =
   app-red
     lam-red
-      (var-red {!!}
+      (var-red x↦n∈ρ
       zero
       lam-red)
   where
-  x↦n∈ρ : ∀ {ρ n} → ("x", n) ∈s (("x" ,  n ) ∷ ρ)
-  x↦n∈ρ {[]} {zero} = tt
-  x↦n∈ρ {[]} {suc zero} = tt
-  x↦n∈ρ {[]} {suc (suc n₁)} = {!!} -- x↦n∈ρ {n = n₁}
-  x↦n∈ρ {x₁ ∷ ρ₁} {zero} = tt
-  x↦n∈ρ {x₁ ∷ ρ₁} {suc n₁} = {!!}
-  
-  
+  x↦n∈ρ : (x , n) ∈s ( ρ ∣ x ↦  n ∣)
+  x↦n∈ρ = {!!}  
+
+
+[]∶id∙id⇓id : [] ∶ (idF ∙ idF) ⟨ [] ⟩ ⇓ _ ∶ idF ⟨ _ ⟩
+[]∶id∙id⇓id = app-red lam-red (var-red tt (zero) lam-red) 
+
+
