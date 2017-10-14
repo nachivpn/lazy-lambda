@@ -1,8 +1,8 @@
 module Term where
 
 open import Prelude
-open import Tactic.Deriving.Eq
 open import Data.Nat
+open import Tactic.Deriving.Eq
 
 Name = String
 Pointer = Nat
@@ -31,7 +31,7 @@ unquoteDecl EqType₁ = deriveEq EqType₁ (quote Term)
 unquoteDecl EqType₂ = deriveEq EqType₂ (quote Closure)
 
 Heap : Nat → Set
-Heap = Vec Closure
+Heap = Vec (Nat × Closure)
 
 _⊢_ : Set → Set → Set
 H ⊢ C = H × C
@@ -71,15 +71,9 @@ _∈s_ : (Name × Pointer) → Env → Set
 
 
 postulate
-  <_post₁ : (m n : Nat) → IsTrue (lessNat m n) → IsTrue (lessNat ((n -N m) -N 1) n)
+  <_post₁ : (m n : Nat) → IsTrue (lessNat m n) → IsTrue (lessNat (n - m - 1) n)
   update-post : ∀ {n ρ} → ( "x" , n ) ∈s ρ ∣ "x" ↦ n ∣
   n<sucn : ∀ {n} → IsTrue (lessNat n (suc n))
-
--- indexed "belongs to"
-data _at_≡_ {n : Nat} (m : Nat) ( H : Heap n) (c : Closure) : Set where
-  indeed : (m<n : IsTrue (lessNat m n))
-    → indexVec H (natToFin ((n -N m) -N 1) {{<_post₁ m n m<n}}) ≡ c
-    → m at H ≡ c  
 
 private
   env : Env
@@ -93,16 +87,19 @@ private
   -- p₂ = {!!}
 
   H : Heap 2
-  H = var "y" ⟨ env ⟩ ∷ var ("x") ⟨ env ⟩ ∷ []
+  H = (1 , var "y" ⟨ env ⟩) ∷ ( 0 , var ("x") ⟨ env ⟩) ∷ []
 
-  p₃ : 0 at H ≡ var "x" ⟨ env ⟩
-  p₃ = indeed true refl
+  -- p₃ : ∈heap H 0 (var "x" ⟨ env ⟩)
+  -- p₃ = tt
 
--- shamelesly copied
-_[_]≔_ : ∀ {a n} {A : Set a} → Vec A n → Fin n → A → Vec A n
-[]       [ ()    ]≔ y
-(x ∷ xs) [ zero  ]≔ y = y ∷ xs
-(x ∷ xs) [ suc i ]≔ y = x ∷ xs [ i ]≔ y
+  idf : Term
+  idf = lam "x" (var "x")
+
+_[_]≔_ : ∀ {n} → Heap n → Nat → Closure → Heap n
+[] [ n ]≔ y = []
+(( n , c ) ∷ H) [ n' ]≔ c' with n == n' 
+... | yes _ = (n , c') ∷ H
+... | no _ = (n , c) ∷ (H [ n' ]≔ c')
 
 data _⇓_ :  ∀ {m n} → Heap m ⊢ Closure → Heap n ⊢ Closure → Set where
   lam-red : ∀ {x t ρ} {n : Nat} {H : Heap n}
@@ -111,24 +108,34 @@ data _⇓_ :  ∀ {m n} → Heap m ⊢ Closure → Heap n ⊢ Closure → Set wh
   app-red : ∀ {t t₁ x u vc ρ ρ₁}
     {n n₁ n' : Nat} {H : Heap n} {H₁ : Heap n₁} {H' : Heap n'}
     → H ∶ t ⟨ ρ ⟩ ⇓ H₁ ∶ lam x t₁ ⟨ ρ₁ ⟩
-    → (u ⟨ ρ ⟩ ∷ H₁) ∶ t₁ ⟨ ρ₁ ∣ x ↦ n₁ ∣ ⟩ ⇓ H' ∶ vc 
+    → ((n₁ , u ⟨ ρ ⟩) ∷ H₁) ∶ t₁ ⟨ ρ₁ ∣ x ↦ n₁ ∣ ⟩ ⇓ H' ∶ vc 
     → H ∶ (t ∙ u) ⟨ ρ ⟩ ⇓ H' ∶ vc
 
   var-red : ∀ { x ρ tc vc} {p : Pointer}
    {n n' : Nat} {H : Heap n} {H' : Heap n'}
-   { fp : Fin n } {fp' : Fin n'}
    → (x , p) ∈s ρ
-   → p at H ≡ tc
+   → (p , tc) ∈v H
    → H ∶ tc ⇓ H' ∶ vc
-   → H ∶ var x ⟨ ρ ⟩ ⇓ (H' [ fp' ]≔ vc) ∶ vc 
+   → H ∶ var x ⟨ ρ ⟩ ⇓ ((p , vc) ∷ H') ∶ vc 
   
 
 idF : Term
 idF = lam "x" (var "x")
 
-id∙id⇓id : {n : Nat} {ρ : Env} {H : Heap n} { H' : Heap (suc n)}
-  → H ∶ (idF ∙ idF) ⟨ ρ ⟩ ⇓ (idF ⟨ ρ ⟩ ∷ H) ∶ idF ⟨ [] ⟩
-id∙id⇓id {n} {ρ} {H} {H'} = app-red lam-red {!!}
+id∙id⇓id : {n : Nat} {ρ : Env} {H : Heap n}
+  → H ∶ (idF ∙ idF) ⟨ ρ ⟩ ⇓ ((n , idF ⟨ ρ ⟩) ∷ (n , idF ⟨ ρ ⟩) ∷ H) ∶ idF ⟨ ρ ⟩
+id∙id⇓id {n} {ρ} {H} =
+  app-red
+    lam-red
+      (var-red {!!}
+      zero
+      lam-red)
   where
-  p : n at (idF ⟨ ρ ⟩ ∷ H) ≡ idF ⟨ ρ ⟩
-  p = {!!}
+  x↦n∈ρ : ∀ {ρ n} → ("x", n) ∈s (("x" ,  n ) ∷ ρ)
+  x↦n∈ρ {[]} {zero} = tt
+  x↦n∈ρ {[]} {suc zero} = tt
+  x↦n∈ρ {[]} {suc (suc n₁)} = {!!} -- x↦n∈ρ {n = n₁}
+  x↦n∈ρ {x₁ ∷ ρ₁} {zero} = tt
+  x↦n∈ρ {x₁ ∷ ρ₁} {suc n₁} = {!!}
+  
+  
