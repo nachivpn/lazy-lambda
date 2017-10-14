@@ -28,8 +28,8 @@ data Heap : Set where
 
 record Distinct-Exp : Set where
   field
-    teh-lookup  : List (Var × Nat)
     teh-exp : Exp
+    teh-lookup  : List (Var × Nat)
 
 
 data _entails_ : Heap → Exp → Set where
@@ -135,29 +135,29 @@ sumN (x₁ ∷ x₂) = x₁ + sum x₂
 -- ... | nothing = (uvar (name (cc))) , ((name x₂ ,  cc) ∷ lkup)
 -- ... | just x₁ = (uvar (name x₁)) , lkup
 
-α-rename : Exp → Nat → (List (Var × Nat)) → (Exp × (List (Var × Nat)))
+α-rename : Exp → Nat → (List (Var × Nat)) → Distinct-Exp
 α-rename (lambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
-... | newexp , newlkup with x₂ lookupvn newlkup
-... | nothing = (lambda (name cc) newexp) , newlkup
-... | just x₁ = (lambda (name x₁) newexp) , (remove x₂ from newlkup)
+... | newexp with x₂ lookupvn Distinct-Exp.teh-lookup newexp
+... | nothing = record { teh-exp = (lambda (name cc) (Distinct-Exp.teh-exp newexp)) ; teh-lookup = Distinct-Exp.teh-lookup newexp}
+... | just x₁ = record {teh-exp = (lambda (name x₁) (Distinct-Exp.teh-exp newexp)) ; teh-lookup = (remove x₂ from Distinct-Exp.teh-lookup newexp)}
 α-rename (x₂ ∙ x₃) cc lkup  with count-vars x₂
 ... | c-vars-in-x₂ with α-rename-var x₃ (c-vars-in-x₂ + cc) lkup
 ... | newx₃ , newlkup with α-rename x₂ cc newlkup
-... | newx₂ , newlkup2 = (newx₂ ∙ newx₃) , newlkup2
+... | newx₂ = record {teh-exp = ((Distinct-Exp.teh-exp newx₂) ∙ newx₃) ; teh-lookup = Distinct-Exp.teh-lookup newx₂}
 α-rename (var x₂) cc lkup with α-rename-var x₂ cc lkup
-... | newx₂ , newlkup = (var newx₂) , newlkup
+... | newx₂ , newlkup = record {teh-exp = (var newx₂) ; teh-lookup = newlkup}
 α-rename (lEt x₁ iN x₂) cc lkup with snd (esplit x₁)
 ... | t with length x₁ + (sumN (map count-vars t))
 ... | t2 with α-rename x₂ (cc + t2) lkup
-... | t3 = (lEt fst (uletα-rename x₁ cc (snd t3)) iN (fst t3)) , snd (uletα-rename x₁ cc (snd t3))
+... | t3 = record {teh-exp = (lEt fst (letα-rename x₁ cc (Distinct-Exp.teh-lookup t3)) iN (Distinct-Exp.teh-exp t3)) ; teh-lookup = snd (letα-rename x₁ cc (Distinct-Exp.teh-lookup t3))}
   where
-    uletα-rename : List (Var × Exp) → Nat → List (Var × Nat) → (List (Var × Exp)) × (List (Var × Nat))
-    uletα-rename [] x₁ x₂ = [] , x₂
-    uletα-rename (x₃ ∷ x₄) x₁ x₂ with uletα-rename x₄ (x₁ + (count-vars (snd x₃) + 1)) x₂
+    letα-rename : List (Var × Exp) → Nat → List (Var × Nat) → (List (Var × Exp)) × (List (Var × Nat))
+    letα-rename [] x₁ x₂ = [] , x₂
+    letα-rename (x₃ ∷ x₄) x₁ x₂ with letα-rename x₄ (x₁ + (count-vars (snd x₃) + 1)) x₂
     ... | t with α-rename (snd x₃) (1 + x₁) (snd t)
-    ... | t2 with (fst x₃) lookupvn (snd t2)
-    ... | nothing = ((name x₁ , fst t2) ∷ fst t) , (fst x₃ , x₁) ∷ snd t
-    ... | just t3 = ((name t3 , fst t2) ∷ fst t) , snd t
+    ... | t2 with (fst x₃) lookupvn (Distinct-Exp.teh-lookup t2)
+    ... | nothing = ((name x₁ , Distinct-Exp.teh-exp t2) ∷ fst t) , (fst x₃ , x₁) ∷ snd t
+    ... | just t3 = ((name t3 , Distinct-Exp.teh-exp t2) ∷ fst t) , snd t
 
 
 {-# NON_TERMINATING #-}
@@ -188,7 +188,7 @@ x extendedby [] = x
 x extendedby (x₁ ∷ x₂) = (x extendby x₁) extendedby x₂
 
 hat_with-regards-to_ : Exp → Heap → Exp
-hat x with-regards-to x₁ = fst (α-rename x {!!} {!!})
+hat x with-regards-to x₁ = Distinct-Exp.teh-exp (α-rename x {!!} {!!})
 
 infix 33 _extendedby_
 infix 34 hat_with-regards-to_
@@ -236,7 +236,7 @@ uexp1 : UExp
 uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
 
 
-ex1 : Exp
-ex1 = fst (α-rename (starTransform uexp1) (0) [])
+ex1 : Distinct-Exp
+ex1 = α-rename (starTransform uexp1) (0) []
 
 
