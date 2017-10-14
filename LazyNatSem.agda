@@ -7,7 +7,6 @@ open import Prelude
 data Var : Set where
   name : Nat → Var
 
-
 _Var₌₌_ : Var → Var → Bool
 _Var₌₌_ (name x) (name x₁) = eqNat x x₁
 
@@ -16,7 +15,6 @@ data UExp  : Set where
   _u∙_     : UExp → UExp → UExp
   uvar     : Var → UExp
   ulet_iN_ : List (Var × UExp) → UExp → UExp
-
 
 data Exp  : Set where
   lambda  : Var → Exp → Exp
@@ -28,6 +26,10 @@ data Heap : Set where
   [] : Heap
   _∷_ : Var × Exp → Heap → Heap
 
+record Distinct-Exp : Set where
+  field
+    teh-lookup  : List (Var × Nat)
+    teh-exp : Exp
 
 
 data _entails_ : Heap → Exp → Set where
@@ -112,36 +114,44 @@ _stack-append_ : stack → stack → stack
 _stack-append_ [] x₁ = x₁
 _stack-append_ (x₂ ∷ x₃) x₁ = x₂ ∷ (x₃ stack-append x₁)
 
-count-vars : UExp → Nat
-count-vars (ulambda x₁ x₂) = 1 + count-vars x₂
-count-vars (x₁ u∙ x₂) = count-vars x₁ + count-vars x₂
-count-vars (uvar x₁) = 1
-count-vars (ulet [] iN x₂) = count-vars x₂
-count-vars (ulet (fst₁ , snd₁) ∷ x₃ iN x₂) = 1 + count-vars snd₁ + count-vars (ulet x₃ iN x₂)
+count-vars : Exp → Nat
+count-vars (lambda x₁ x₂) = 1 + count-vars x₂
+count-vars (x₁ ∙ x₂) = count-vars x₁ + 1
+count-vars (var x₁) = 1
+count-vars (lEt [] iN x₂) = count-vars x₂
+count-vars (lEt (fst₁ , snd₁) ∷ x₃ iN x₂) = 1 + count-vars snd₁ + count-vars (lEt x₃ iN x₂)
 
 sumN : List Nat → Nat
 sumN [] = 0
 sumN (x₁ ∷ x₂) = x₁ + sum x₂
 
+α-rename-var : Var → Nat  → (List (Var × Nat)) → (Var × (List (Var × Nat)))
+α-rename-var x cc lkup with x lookupvn lkup
+... | nothing = ((name (cc))) , ((x ,  cc) ∷ lkup)
+... | just x₁ = ((name x₁)) , lkup
+-- ... | newexp , newlkup with α-rename x₂ cc newlkup
+-- ... | newexp2 , newlkup2 = (newexp2 u∙ newexp) , newlkup2
+-- with name x₂ lookupvn lkup
+-- ... | nothing = (uvar (name (cc))) , ((name x₂ ,  cc) ∷ lkup)
+-- ... | just x₁ = (uvar (name x₁)) , lkup
 
-α-rename : UExp → Nat → (List (Var × Nat)) → (UExp × (List (Var × Nat)))
-α-rename (ulambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
+α-rename : Exp → Nat → (List (Var × Nat)) → (Exp × (List (Var × Nat)))
+α-rename (lambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
 ... | newexp , newlkup with x₂ lookupvn newlkup
-... | nothing = (ulambda (name cc) newexp) , newlkup
-... | just x₁ = (ulambda (name x₁) newexp) , (remove x₂ from newlkup)
-α-rename (x₂ u∙ x₃) cc lkup  with count-vars x₂
-... | t with α-rename x₃ (t + cc) lkup
-... | newexp , newlkup with α-rename x₂ cc newlkup
-... | newexp2 , newlkup2 = (newexp2 u∙ newexp) , newlkup2
-α-rename (uvar (name x₂)) cc lkup with name x₂ lookupvn lkup
-... | nothing = (uvar (name (cc))) , ((name x₂ ,  cc) ∷ lkup)
-... | just x₁ = (uvar (name x₁)) , lkup
-α-rename (ulet x₁ iN x₂) cc lkup with snd (usplit x₁)
+... | nothing = (lambda (name cc) newexp) , newlkup
+... | just x₁ = (lambda (name x₁) newexp) , (remove x₂ from newlkup)
+α-rename (x₂ ∙ x₃) cc lkup  with count-vars x₂
+... | c-vars-in-x₂ with α-rename-var x₃ (c-vars-in-x₂ + cc) lkup
+... | newx₃ , newlkup with α-rename x₂ cc newlkup
+... | newx₂ , newlkup2 = (newx₂ ∙ newx₃) , newlkup2
+α-rename (var x₂) cc lkup with α-rename-var x₂ cc lkup
+... | newx₂ , newlkup = (var newx₂) , newlkup
+α-rename (lEt x₁ iN x₂) cc lkup with snd (esplit x₁)
 ... | t with length x₁ + (sumN (map count-vars t))
 ... | t2 with α-rename x₂ (cc + t2) lkup
-... | t3 = (ulet fst (uletα-rename x₁ cc (snd t3)) iN (fst t3)) , snd (uletα-rename x₁ cc (snd t3))
+... | t3 = (lEt fst (uletα-rename x₁ cc (snd t3)) iN (fst t3)) , snd (uletα-rename x₁ cc (snd t3))
   where
-    uletα-rename : List (Var × UExp) → Nat → List (Var × Nat) → (List (Var × UExp)) × (List (Var × Nat))
+    uletα-rename : List (Var × Exp) → Nat → List (Var × Nat) → (List (Var × Exp)) × (List (Var × Nat))
     uletα-rename [] x₁ x₂ = [] , x₂
     uletα-rename (x₃ ∷ x₄) x₁ x₂ with uletα-rename x₄ (x₁ + (count-vars (snd x₃) + 1)) x₂
     ... | t with α-rename (snd x₃) (1 + x₁) (snd t)
@@ -177,12 +187,11 @@ _extendedby_ : Heap → List (Var × Exp) → Heap
 x extendedby [] = x
 x extendedby (x₁ ∷ x₂) = (x extendby x₁) extendedby x₂
 
-hat : Var → Heap → Var
-hat x [] = name 0
-hat x ((fst₁ , snd₁) ∷ x₂) = name (max (unname (hat x x₂)) (max (unname fst₁) (emax snd₁)))
+hat_with-regards-to_ : Exp → Heap → Exp
+hat x with-regards-to x₁ = fst (α-rename x {!!} {!!})
 
 infix 33 _extendedby_
-infix 34 hat
+infix 34 hat_with-regards-to_
 
 
 
@@ -195,15 +204,26 @@ data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ entails E₁ → 
                                   Γ ⊢ (e ∙ x) ⇓ (Θ ⊢ z)
   var-red : {Γ Δ : Heap} { x y : Var} {e z : Exp} →
     Γ ⊢ e ⇓ Δ ⊢ z →
-    Γ extendedby ((x , e) ∷ []) ⊢ var x ⇓ Δ extendedby ( (x , z) ∷ []) ⊢ z
+    Γ extendedby ((x , e) ∷ []) ⊢ var x ⇓ Δ extendedby ( (x , z) ∷ []) ⊢ hat z with-regards-to Δ
 
   lEt-red : {Γ Δ : Heap} {e z : Exp} {TT : List (Var × Exp)} →
     Γ extendedby TT ⊢ e   ⇓ Δ ⊢ z →
     Γ ⊢ lEt TT iN e       ⇓ Δ ⊢ z
 
+data Value : Set where
+  Fn_ : Value
+  _↓Fn_ : Value → Value →  Value
 
-evalsteplet : {Γ : Heap} {e : Exp} {TT : List (Var × Exp)}  → Γ entails (lEt TT iN e) → Γ extendedby TT entails e
-evalsteplet {.H} {e} {TT} (H ⊢ .(lEt TT iN e)) = H extendedby TT ⊢ e
+Env = List (Var × Value)
+
+ρ : Env → Var → Value
+ρ = {!!}
+
+||_||with-env_ : Exp → Env → Value
+|| lambda x₂ x₃ ||with-env x₁ = {!!}
+|| x₂ ∙ x₃ ||with-env x₁ = (|| x₂ ||with-env x₁) ↓Fn ρ x₁ x₃
+|| var x₂ ||with-env x₁ = ρ x₁ x₂
+|| lEt x₂ iN x₃ ||with-env x₁ = || x₃ ||with-env {!!}
 
 postulate
   three+two : Exp
@@ -212,6 +232,11 @@ postulate
   U+one V+V : Exp
   P : ∀ {Γ Δ} → (Γ  ⊢ three+two) ⇓ (Δ ⊢ five)
 
--- ex1 : Exp
--- ex1 = 
+uexp1 : UExp
+uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
+
+
+ex1 : Exp
+ex1 = fst (α-rename (starTransform uexp1) (0) [])
+
 
