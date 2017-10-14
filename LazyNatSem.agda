@@ -15,6 +15,7 @@ data UExp  : Set where
   ulambda  : Var → UExp → UExp
   _u∙_     : UExp → UExp → UExp
   uvar     : Var → UExp
+  ulet_iN_ : List (Var × UExp) → UExp → UExp
 
 
 data Exp  : Set where
@@ -32,9 +33,17 @@ data Heap : Set where
 data _entails_ : Heap → Exp → Set where
   _⊢_ : (H : Heap) → (E : Exp) → H entails E
 
+lookup_in-heap_ : (X : Var) → (H : Heap) → Maybe Exp
+lookup X in-heap [] = nothing
+lookup X in-heap ((fst₁ , snd₁) ∷ H) = if X Var₌₌ fst₁ then just snd₁ else lookup X in-heap H
 
+
+{-# NON_TERMINATING #-}
 _[|_/_|] : (E : Exp) → (X Y : Var) → Exp
-_[|_/_|] = {!!}
+lambda mvar mexp [| X / Y |] = if mvar Var₌₌ Y then lambda mvar mexp else lambda mvar (mexp [| X / Y |])
+(mexp ∙ xvar) [| X / Y |] = (mexp [| X / Y |]) ∙ (if (xvar Var₌₌ Y) then X else xvar)
+var mvar [| X / Y |] = if mvar Var₌₌ Y then var X else var mvar
+(lEt x iN E) [| X / Y |] = lEt (map (λ x₁ → if ((fst x₁) Var₌₌ Y) then x₁ else ((fst x₁) , ((snd x₁) [| X / Y |]))) x) iN (E [| X / Y |])
 
 unname : Var → Nat
 unname (name x) = x
@@ -51,11 +60,12 @@ foldN : Nat → List Nat → Nat
 foldN x [] = x
 foldN x (x₁ ∷ x₂) = max x (max x₁ (foldN x x₂))
 
-{-# NON_TERMINATING #-}
 umax : UExp → Nat
 umax (ulambda x x₁) = max (umax x₁) (unname x)
 umax (x u∙ x₁) = max (umax x) (umax x₁)
 umax (uvar x) = unname x
+umax (ulet x iN x₁) = {!!}
+
 
 {-# NON_TERMINATING #-}
 emax : Exp → Nat
@@ -76,6 +86,8 @@ w = (name 4)
 
 testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
 testα2 = (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))
+testα3 : UExp
+testα3 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
 
 stack = List Var
 vlookup = List (Var × Nat)
@@ -100,10 +112,17 @@ _stack-append_ : stack → stack → stack
 _stack-append_ [] x₁ = x₁
 _stack-append_ (x₂ ∷ x₃) x₁ = x₂ ∷ (x₃ stack-append x₁)
 
-count-vars_ : UExp → Nat
-count-vars ulambda x₁ x₂ = 1 + count-vars x₂
+count-vars : UExp → Nat
+count-vars (ulambda x₁ x₂) = 1 + count-vars x₂
 count-vars (x₁ u∙ x₂) = count-vars x₁ + count-vars x₂
-count-vars uvar x₁ = 1
+count-vars (uvar x₁) = 1
+count-vars (ulet [] iN x₂) = count-vars x₂
+count-vars (ulet (fst₁ , snd₁) ∷ x₃ iN x₂) = 1 + count-vars snd₁ + count-vars (ulet x₃ iN x₂)
+
+sumN : List Nat → Nat
+sumN [] = 0
+sumN (x₁ ∷ x₂) = x₁ + sum x₂
+
 
 α-rename : UExp → Nat → (List (Var × Nat)) → (UExp × (List (Var × Nat)))
 α-rename (ulambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
@@ -117,13 +136,27 @@ count-vars uvar x₁ = 1
 α-rename (uvar (name x₂)) cc lkup with name x₂ lookupvn lkup
 ... | nothing = (uvar (name (cc))) , ((name x₂ ,  cc) ∷ lkup)
 ... | just x₁ = (uvar (name x₁)) , lkup
+α-rename (ulet x₁ iN x₂) cc lkup with snd (usplit x₁)
+... | t with length x₁ + (sumN (map count-vars t))
+... | t2 with α-rename x₂ (cc + t2) lkup
+... | t3 = (ulet fst (uletα-rename x₁ cc (snd t3)) iN (fst t3)) , snd (uletα-rename x₁ cc (snd t3))
+  where
+    uletα-rename : List (Var × UExp) → Nat → List (Var × Nat) → (List (Var × UExp)) × (List (Var × Nat))
+    uletα-rename [] x₁ x₂ = [] , x₂
+    uletα-rename (x₃ ∷ x₄) x₁ x₂ with uletα-rename x₄ (x₁ + (count-vars (snd x₃) + 1)) x₂
+    ... | t with α-rename (snd x₃) (1 + x₁) (snd t)
+    ... | t2 with (fst x₃) lookupvn (snd t2)
+    ... | nothing = ((name x₁ , fst t2) ∷ fst t) , (fst x₃ , x₁) ∷ snd t
+    ... | just t3 = ((name t3 , fst t2) ∷ fst t) , snd t
+
 
 {-# NON_TERMINATING #-}
 starTransform : UExp → Exp
 starTransform (ulambda x x₁) = lambda x (starTransform x₁)
 starTransform (uvar x) = var x
-starTransform (e₁ u∙ uvar x) = starTransform e₁ ∙ x
 starTransform (e₁ u∙ e₂) = lEt (name (suc (max (umax e₂) (umax e₁))) , (starTransform e₂)) ∷ [] iN (starTransform e₁ ∙ name ((suc (max (umax e₂) (umax e₁)))))
+starTransform (ulet x₁ iN x₂) with usplit x₁
+... | t = lEt (zip (fst t) (map starTransform (snd t))) iN (starTransform x₂)
 
 
 
@@ -162,7 +195,7 @@ data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ entails E₁ → 
                                   Γ ⊢ (e ∙ x) ⇓ (Θ ⊢ z)
   var-red : {Γ Δ : Heap} { x y : Var} {e z : Exp} →
     Γ ⊢ e ⇓ Δ ⊢ z →
-    Γ extendedby ((x , e) ∷ []) ⊢ var x ⇓ Δ extendedby ( (x , z) ∷ []) ⊢ z -- (hat z (Δ extendedby ( (x , var z) ∷ [])))
+    Γ extendedby ((x , e) ∷ []) ⊢ var x ⇓ Δ extendedby ( (x , z) ∷ []) ⊢ z
 
   lEt-red : {Γ Δ : Heap} {e z : Exp} {TT : List (Var × Exp)} →
     Γ extendedby TT ⊢ e   ⇓ Δ ⊢ z →
@@ -179,38 +212,6 @@ postulate
   U+one V+V : Exp
   P : ∀ {Γ Δ} → (Γ  ⊢ three+two) ⇓ (Δ ⊢ five)
 
-ex1 : Exp
-ex1 = lEt (U , three+two) ∷ (V , U+one) ∷ [] iN ((V+V))
-
-badsub : Exp
-badsub = lambda X (var Y)
-
-uloop : UExp
-uloop = (ulambda x ((uvar x) u∙ (uvar x))) u∙ ((ulambda x ((uvar x) u∙ (uvar x))))
-
-ex2 : {x : Var} →  Exp
-ex2 {x} = lEt (x , (lambda x ((var x) ∙ x))) ∷ [] iN (lambda x ((var x) ∙ x)) ∙ x
-
-pex2 : {Γ : Heap} {e : Exp} {x y : Var} {TT : List (Var × Exp)} → [] ⊢ ex2 {x} ⇓ ( (x , (lambda x ((var x) ∙ x))) ∷ []) ⊢ ex2 {x}
-pex2 {Γ} {e} {x} {y} {TT} with lEt-red {[]} {_} { (lambda x ((var x) ∙ x)) ∙ x} {_} {(x , (lambda x ((var x) ∙ x))) ∷ []}
-... | t = {!!}
-
-
--- with app-red {_} {_} {_} {_} {_} {_} {_} {_}
--- ... | w = {!!}
-
-
-
-
--- with app-red  {Γ} {_} {Δ} {_} {_} {_} {_} {_}
--- ... | w = {!!} 
--- ex1sub1 : {Γ Δ : Heap} {x y : Var} {e  z : Exp } → ((( U , three+two ) ∷ []) ⊢ (var U)) ⇓ (((( U , five ))∷ []) ⊢ five)
--- ex1sub1 {Γ} {Δ} {x} {y} {e} {z} with var-red {[]} {[]} {U} {y} {three+two} {five}
--- ... | t = {!!}
--- -- ... | t with t P
--- -- ... | q = q
-
--- ex1sub2 : {Γ Δ : Heap} {x y : Var} {e  z : Exp } → ((( U , three+two ) ∷ ( V , U+one )∷ []) ⊢ (U+one)) ⇓ (((( U , five ))∷ []) ⊢ six)
--- ex1sub2 with app-red {!!} {!!}
--- ... | t = {!!}
+-- ex1 : Exp
+-- ex1 = 
 
