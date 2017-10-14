@@ -187,8 +187,12 @@ _extendedby_ : Heap → List (Var × Exp) → Heap
 x extendedby [] = x
 x extendedby (x₁ ∷ x₂) = (x extendby x₁) extendedby x₂
 
+max-of-heap : Heap → Nat
+max-of-heap [] = 0
+max-of-heap ((name x₁ , snd₁) ∷ x₂) = max (max x₁ (emax snd₁)) (max-of-heap x₂)
+
 hat_with-regards-to_ : Exp → Heap → Exp
-hat x with-regards-to x₁ = fst (α-rename x {!!} {!!})
+hat x with-regards-to x₁ = fst (α-rename x (max-of-heap x₁) [])
 
 infix 33 _extendedby_
 infix 34 hat_with-regards-to_
@@ -240,3 +244,4 @@ ex1 : Exp
 ex1 = fst (α-rename (starTransform uexp1) (0) [])
 
 
+ex2 = hat ex1 with-regards-to ((x , var z) ∷ [])
