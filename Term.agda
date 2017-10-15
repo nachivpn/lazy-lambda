@@ -1,6 +1,7 @@
 module Term where
 
 open import Prelude
+open import Data.Nat
 open import Tactic.Deriving.Eq
 
 Name = Nat
@@ -84,6 +85,16 @@ postulate
   n<sucn : ∀ {n} → IsTrue (lessNat n (suc n))
   n==n : ∀ {n} → IsTrue (n ==n n)
 
+
+¬[_] : ∀ {a b : Name} → Dec (a ≡ b) → Set
+¬[ (yes x₁) ] = ⊥
+¬[ (no x₁) ] = ⊤
+
+data _,_∈x_ (n : Name) (p : Pointer) : Env → Set where
+  zero : ∀ {xs}            → n , p ∈x ((n , p) ∷ xs)
+  suc  : ∀ {n' : Name} { p' : Pointer} {xs} {pr : ¬[  n == n'  ]}
+    → n , p ∈x xs → n , p ∈x ((n' , p') ∷ xs)
+
 private
   env : Env
   env = (y , 5) ∷ (x , 1) ∷ (z , 0) ∷(x , 0 ) ∷ []
@@ -91,9 +102,16 @@ private
   p₁ : (x , 1) ∈s env
   p₁ = tt
 
+  p₁' : x , 1 ∈x env
+  p₁' = suc zero
+
   -- this cannot be proved (◕‿◕)
   -- p₂ :  (x , 0) ∈s env
   -- p₂ = {!!}
+
+  -- type checker complains! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧
+  -- p₂' : x , 0 ∈x env
+  -- p₂' = suc (suc (suc zero))
 
   H : Heap 2
   H = (1 , var y ⟨ env ⟩) ∷ ( 0 , var x ⟨ env ⟩) ∷ []
@@ -122,10 +140,11 @@ data _⇓_ :  ∀ {m n} → Heap m ⊢ Closure → Heap n ⊢ Closure → Set wh
 
   var-red : ∀ { x ρ tc vc} {p : Pointer}
    {n n' : Nat} {H : Heap n} {H' : Heap n'}
-   → (x , p) ∈s ρ
+   → x , p ∈x ρ
    → (p , tc) ∈v H
    → H ∶ tc ⇓ H' ∶ vc
-   → H ∶ var x ⟨ ρ ⟩ ⇓ ((p , vc) ∷ H') ∶ vc -- this assumes ∈s access for correctness (TODO, currently ∈v) and GC for scpace
+   → H ∶ var x ⟨ ρ ⟩ ⇓ ((p , vc) ∷ H') ∶ vc
+   -- this assumes ∈s access for correctness (TODO, currently ∈v) and GC for scpace
   
 
 idF : Term
@@ -136,15 +155,8 @@ id∙id⇓id : {n : Nat} {ρ : Env} {H : Heap n}
 id∙id⇓id {n} {ρ} {H} =
   app-red
     lam-red
-      (var-red x↦n∈ρ
-      zero
-      lam-red)
-  where
-  x↦n∈ρ : (x , n) ∈s ( ρ ∣ x ↦  n ∣)
-  x↦n∈ρ = {!!}  
-
-
-[]∶id∙id⇓id : [] ∶ (idF ∙ idF) ⟨ [] ⟩ ⇓ _ ∶ idF ⟨ _ ⟩
-[]∶id∙id⇓id = app-red lam-red (var-red tt (zero) lam-red) 
-
+      (var-red
+        zero
+        zero
+        lam-red)
 
