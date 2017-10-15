@@ -7,7 +7,8 @@ p pointer names
 
 ρ[x ↦ p] = (x,p) : ρ
 
-((y,p):ρ)(x) := if x = y then p else ρ(x)
+-- lookup
+-- ((y,p):ρ)(x) := if x = y then p else ρ(x)
 -- important to take the first match to preserve scoping/shadowing
 
 t,u ::= x | t u | λ x. t
@@ -42,7 +43,7 @@ H ; t u / ρ ⇓ H2 ; vc
 
 
 p  = ρ(x)
-tc = H(ρ(x))
+tc = H(p)
 H ; tc ⇓ H1 ; vc
 ------------------------
 H ; x / ρ ⇓ H1[p ↦ vc] ; vc
