@@ -78,11 +78,15 @@ private
   -- p₂ = suc (suc (suc zero))
 
   H : Heap 3
-  H = (1 , var y ⟨ env ⟩) ∷ ( 0 , var x ⟨ env ⟩) ∷ (2 , var y ⟨ env ⟩) ∷ []
+  H = (2 , var y ⟨ env ⟩) ∷ ( 0 , var x ⟨ env ⟩) ∷ (2 , var z ⟨ env ⟩) ∷ []
 
   p₃ : 0 ↦ var x ⟨ env ⟩ ∈h H
   p₃ = suc zero
 
-  p₄ :  2 ↦ var y ⟨ env ⟩ ∈h H
-  p₄ = suc (suc zero)
+  p₄ : 2 ↦ var y ⟨ env ⟩ ∈h H
+  p₄ = zero
+
+  --  type checker complains!
+  -- p₅ : 2 ↦ var z ⟨ env ⟩ ∈h H
+  -- p₅ = suc (suc zero)
   
