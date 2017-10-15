@@ -22,9 +22,10 @@ data Exp  : Set where
   var     : Var → Exp
   lEt_iN_ : List (Var × Exp) → Exp → Exp
 
-data Heap : Set where
-  [] : Heap
-  _∷_ : Var × Exp → Heap → Heap
+-- data Heap : Set where
+--   [] : Heap
+--   _∷_ : Var × Exp → Heap → Heap
+Heap = List (Var × Exp)
 
 record Distinct-Exp : Set where
   field
@@ -136,7 +137,7 @@ sumN (x₁ ∷ x₂) = x₁ + sum x₂
 -- ... | just x₁ = (uvar (name x₁)) , lkup
 
 α-rename : Exp → Nat → (List (Var × Nat)) → (Exp × (List (Var × Nat)))
-α-rename (lambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) lkup
+α-rename (lambda x₂ x₃) cc lkup with α-rename x₃ (cc + 1) ((x₂ , cc) ∷ lkup)
 ... | newexp , newlkup with x₂ lookupvn newlkup
 ... | nothing = (lambda (name cc) newexp) , newlkup
 ... | just x₁ = (lambda (name x₁) newexp) , (remove x₂ from newlkup)
@@ -191,8 +192,33 @@ max-of-heap : Heap → Nat
 max-of-heap [] = 0
 max-of-heap ((name x₁ , snd₁) ∷ x₂) = max (max x₁ (emax snd₁)) (max-of-heap x₂)
 
+bounds-α-rename-var : Var → List (Var × Nat) → Var
+bounds-α-rename-var x x₁ with x lookupvn x₁
+... | nothing = x
+... | just x₂ = name x₂
+
+bounds-α-rename : Exp → Nat → List (Var × Nat) → Exp × (List (Var × Nat))
+bounds-α-rename (lambda x₃ x₄) cc lkup with bounds-α-rename x₄ (1 + cc) ((x₃ , cc) ∷ lkup)
+... | t = (lambda (name cc) (fst t)) , lkup
+bounds-α-rename (x₃ ∙ x₄) cc lkup with bounds-α-rename-var x₄ lkup
+... | t with bounds-α-rename x₃ cc lkup
+... | t2 = ((fst t2) ∙ t) , lkup
+bounds-α-rename (var x₃) x₁ lkup =  var (bounds-α-rename-var x₃ lkup) , lkup
+bounds-α-rename (lEt x₁ iN x₂) cc lkup with snd (esplit x₁)
+... | t with length x₁ + (sumN (map count-vars t))
+... | t2 with bounds-α-rename x₂ (cc + t2) lkup
+... | t3 = (lEt fst (uletα-rename x₁ cc (snd t3)) iN (fst t3)) , snd (uletα-rename x₁ cc (snd t3))
+  where
+    uletα-rename : List (Var × Exp) → Nat → List (Var × Nat) → (List (Var × Exp)) × (List (Var × Nat))
+    uletα-rename [] x₁ x₂ = [] , x₂
+    uletα-rename (x₃ ∷ x₄) x₁ x₂ with uletα-rename x₄ (x₁ + (count-vars (snd x₃) + 1)) x₂
+    ... | t with bounds-α-rename (snd x₃) (1 + x₁) (snd t)
+    ... | t2 with (fst x₃) lookupvn (snd t2)
+    ... | nothing = ((name x₁ , fst t2) ∷ fst t) , (fst x₃ , x₁) ∷ snd t
+    ... | just t3 = ((name t3 , fst t2) ∷ fst t) , snd t
+
 hat_with-regards-to_ : Exp → Heap → Exp
-hat x with-regards-to x₁ = fst (α-rename x (max-of-heap x₁) [])
+hat x with-regards-to x₁ = fst (bounds-α-rename x (max-of-heap x₁) [])
 
 infix 33 _extendedby_
 infix 34 hat_with-regards-to_
@@ -215,19 +241,29 @@ data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ entails E₁ → 
     Γ ⊢ lEt TT iN e       ⇓ Δ ⊢ z
 
 data Value : Set where
-  Fn_ : Value
-  _↓Fn_ : Value → Value →  Value
+  Fn_ :  Var × Exp × (List (Var × Value)) → Value
+  _↓Fn : Value →  (Value → Value)
 
 Env = List (Var × Value)
 
 ρ : Env → Var → Value
-ρ = {!!}
+ρ [] x₁ = {!!}
+ρ ((fst₁ , snd₁) ∷ x₃) x₁ = if fst₁ Var₌₌ x₁ then snd₁ else ρ x₃ x₁ 
 
 ||_||with-env_ : Exp → Env → Value
-|| lambda x₂ x₃ ||with-env x₁ = {!!}
-|| x₂ ∙ x₃ ||with-env x₁ = (|| x₂ ||with-env x₁) ↓Fn ρ x₁ x₃
-|| var x₂ ||with-env x₁ = ρ x₁ x₂
-|| lEt x₂ iN x₃ ||with-env x₁ = || x₃ ||with-env {!!}
+|| lambda y e ||with-env env = Fn ( y , e , env)  
+|| x₂ ∙ x₃ ||with-env env = ((|| x₂ ||with-env env) ↓Fn) (ρ env x₃)
+|| var x₂ ||with-env env = ρ env x₂
+|| lEt x₂ iN x₃ ||with-env env = || x₃ ||with-env (<|| x₂ ||> env)
+  where
+    <||_||>_ : Heap → Env → Env
+    <|| [] ||> env = env
+    <|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (<|| h ||> env)
+
+eval : Value → Value
+eval (Fn (fst₁ , fst₂ , snd₁)) = Fn (fst₁ , fst₂ , snd₁)
+eval (((Fn (y , e' , env)) ↓Fn) x₂) = (λ v → || e' ||with-env ((y , v) ∷ env)) x₂
+eval (((x₁ ↓Fn) x₃ ↓Fn) x₂) = ((((eval x₁) ↓Fn) x₃ ↓Fn) x₂) 
 
 postulate
   three+two : Exp
@@ -237,7 +273,10 @@ postulate
   P : ∀ {Γ Δ} → (Γ  ⊢ three+two) ⇓ (Δ ⊢ five)
 
 uexp1 : UExp
-uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
+uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x ((uvar y) u∙ (uvar x))
+
+uexp2 : UExp
+uexp2 = (ulambda x (uvar x)) u∙ (uvar y)
 
 
 ex1 : Exp
@@ -245,3 +284,10 @@ ex1 = fst (α-rename (starTransform uexp1) (0) [])
 
 
 ex2 = hat ex1 with-regards-to ((x , var z) ∷ [])
+
+
+ex3 = fst (α-rename (starTransform uexp2) (0) [])
+
+sem-ex3 = || ex3 ||with-env []
+
+eval-ex3 = eval sem-ex3
