@@ -254,11 +254,15 @@ Env = List (Var × Value)
 || lambda y e ||with-env env = Fn ( y , e , env)  
 || x₂ ∙ x₃ ||with-env env = ((|| x₂ ||with-env env) ↓Fn) (ρ env x₃)
 || var x₂ ||with-env env = ρ env x₂
-|| lEt x₂ iN x₃ ||with-env env = || x₃ ||with-env (<|| x₂ ||> env)
+|| lEt x₂ iN x₃ ||with-env env = || x₃ ||with-env (i<|| x₂ ||> env)
   where
-    <||_||>_ : Heap → Env → Env
-    <|| [] ||> env = env
-    <|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (<|| h ||> env)
+    i<||_||>_ : Heap → Env → Env
+    i<|| [] ||> env = env
+    i<|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (i<|| h ||> env)
+
+<||_||>_ : Heap → Env → Env
+<|| [] ||> env = env
+<|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (<|| h ||> env)
 
 eval : Value → Value
 eval (Fn (fst₁ , fst₂ , snd₁)) = Fn (fst₁ , fst₂ , snd₁)
@@ -291,3 +295,9 @@ ex3 = fst (α-rename (starTransform uexp2) (0) [])
 sem-ex3 = || ex3 ||with-env []
 
 eval-ex3 = eval sem-ex3
+
+-- _≤ᵣ_ : {e : Env} → ρ 
+-- r1 ≤ᵣ r2 = ρ 
+
+theorem2 : {ρ : Env} {Γ Δ : Heap} {e z : Exp} → Γ ⊢ e ⇓ Δ ⊢ z → (|| e ||with-env (<|| Γ ||> ρ) ≡ || z ||with-env (<|| Δ ||> ρ)) -- ((<|| Γ ||> ρ) ≤ᵣ (<|| Δ ||> ρ))
+theorem2 = {!!}
