@@ -40,10 +40,11 @@ postulate
             zero
             zero
             lam-red)))
-      -- evaluating 2nd x of δ
+      -- evaluating body of value of x
       (var-red
         zero
         zero
+         -- evaluating 2nd x of δ
         (var-red
           zero
           (suc {pr = n¬≡n+4} zero)
