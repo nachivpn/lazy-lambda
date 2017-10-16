@@ -3,7 +3,6 @@ module LazyNatSem where
 
 open import Prelude
 
-
 data Var : Set where
   name : Nat → Var
 
@@ -42,11 +41,11 @@ lookup X in-heap ((fst₁ , snd₁) ∷ H) = if X Var₌₌ fst₁ then just snd
 
 
 {-# NON_TERMINATING #-}
-_[|_/_|] : (E : Exp) → (X Y : Var) → Exp
-lambda mvar mexp [| X / Y |] = if mvar Var₌₌ Y then lambda mvar mexp else lambda mvar (mexp [| X / Y |])
-(mexp ∙ xvar) [| X / Y |] = (mexp [| X / Y |]) ∙ (if (xvar Var₌₌ Y) then X else xvar)
-var mvar [| X / Y |] = if mvar Var₌₌ Y then var X else var mvar
-(lEt x iN E) [| X / Y |] = lEt (map (λ x₁ → if ((fst x₁) Var₌₌ Y) then x₁ else ((fst x₁) , ((snd x₁) [| X / Y |]))) x) iN (E [| X / Y |])
+_⟦_/_⟧ : (E : Exp) → (X Y : Var) → Exp
+lambda mvar mexp ⟦ X / Y ⟧ = if mvar Var₌₌ Y then lambda mvar mexp else lambda mvar (mexp ⟦ X / Y ⟧)
+(mexp ∙ xvar) ⟦ X / Y ⟧ = (mexp ⟦ X / Y ⟧) ∙ (if (xvar Var₌₌ Y) then X else xvar)
+var mvar ⟦ X / Y ⟧ = if mvar Var₌₌ Y then var X else var mvar
+(lEt x iN E) ⟦ X / Y ⟧ = lEt (map (λ x₁ → if ((fst x₁) Var₌₌ Y) then x₁ else ((fst x₁) , ((snd x₁) ⟦ X / Y ⟧))) x) iN (E ⟦ X / Y ⟧)
 
 unname : Var → Nat
 unname (name x) = x
@@ -67,30 +66,22 @@ umax : UExp → Nat
 umax (ulambda x x₁) = max (umax x₁) (unname x)
 umax (x u∙ x₁) = max (umax x) (umax x₁)
 umax (uvar x) = unname x
-umax (ulet x iN x₁) = {!!}
+umax (ulet [] iN x₁) = umax x₁
+umax (ulet (name x , xexp) ∷ x₂ iN x₁) = max x (max (umax xexp) (umax (ulet x₂ iN x₁)))
 
-
-{-# NON_TERMINATING #-}
 emax : Exp → Nat
 emax (lambda x x₁) = max (emax x₁) (unname x)
-emax (x ∙ x₁) = max (emax x) (emax (var x₁))
+emax (x ∙ (name x₁)) = max (emax x) x₁
 emax (var x) = unname x
-emax (lEt x iN x₁) with esplit x
-... | t with foldN 0 (map emax (snd t))
-... | w with foldN 0 (map unname (fst t))
-... | q = max w q
-
-x = (name 1)
-y = (name 2)
-z = (name 3)
-w = (name 4)
+emax (lEt [] iN x₁) = emax x₁
+emax (lEt (name fst₁ , snd₁) ∷ x₂ iN x₁) = max fst₁ (max (emax snd₁) (emax (lEt x₂ iN x₁)))
 
 
 
-testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
-testα2 = (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))
-testα3 : UExp
-testα3 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
+-- testα = ((uvar y) u∙ (ulambda x (uvar z))) u∙ ulambda x (ulambda y (ulambda z (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))))
+-- testα2 = (ulambda x (((uvar y) u∙ (uvar x)) u∙ (uvar x)))
+-- testα3 : UExp
+-- testα3 = ulet (y , (uvar z)) ∷ [] iN ulambda x (uvar y)
 
 stack = List Var
 vlookup = List (Var × Nat)
@@ -171,11 +162,11 @@ starTransform (ulet x₁ iN x₂) with usplit x₁
 
 
 
--- tstExp1 [| (name 1)  / (name 0) |]
+-- tstExp1 ⟦ (name 1)  / (name 0) ⟧
 
 infix 30 _⊢_
 infix 20 _⇓_
-infix 31 _[|_/_|]
+infix 31 _⟦_/_⟧
 infix 32 lEt_iN_
 
 
@@ -229,7 +220,7 @@ data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ entails E₁ → 
   lam-red : {Γ : Heap} → {x : Var} → {e : Exp} → Γ ⊢ lambda x e ⇓ Γ ⊢ lambda x e
 
   app-red : {Γ Θ Δ : Heap} {x y : Var} {e e' z : Exp} →
-    Γ ⊢ e ⇓ Δ ⊢ lambda y e'                →                 Δ ⊢ e' [| x / y |] ⇓ Θ ⊢ z →
+    Γ ⊢ e ⇓ Δ ⊢ lambda y e'                →                 Δ ⊢ e' ⟦ x / y ⟧ ⇓ Θ ⊢ z →
 -- ---------------------------------------------------------------------------------------------
                                   Γ ⊢ (e ∙ x) ⇓ (Θ ⊢ z)
   var-red : {Γ Δ : Heap} { x y : Var} {e z : Exp} →
@@ -240,64 +231,132 @@ data _⇓_ : {H₁ H₂ : Heap} → {E₁ E₂ : Exp} → H₁ entails E₁ → 
     Γ extendedby TT ⊢ e   ⇓ Δ ⊢ z →
     Γ ⊢ lEt TT iN e       ⇓ Δ ⊢ z
 
+
 data Value : Set where
   Fn_ :  Var × Exp × (List (Var × Value)) → Value
-  _↓Fn : Value →  (Value → Value)
+  _↓Fn_ : Value → Value → Value
+  ρ : List (Var × Value) → Var → Value
+  ρ₀ : Value
 
 Env = List (Var × Value)
 
-ρ : Env → Var → Value
-ρ [] x₁ = {!!}
-ρ ((fst₁ , snd₁) ∷ x₃) x₁ = if fst₁ Var₌₌ x₁ then snd₁ else ρ x₃ x₁ 
+-- ρ : Env → Var → Value
+-- ρ [] x₁ = Fn (x₁ , var x₁ , [])
+-- ρ ((fst₁ , snd₁) ∷ x₃) x₁ = if fst₁ Var₌₌ x₁ then snd₁ else ρ x₃ x₁ 
 
-||_||with-env_ : Exp → Env → Value
-|| lambda y e ||with-env env = Fn ( y , e , env)  
-|| x₂ ∙ x₃ ||with-env env = ((|| x₂ ||with-env env) ↓Fn) (ρ env x₃)
-|| var x₂ ||with-env env = ρ env x₂
-|| lEt x₂ iN x₃ ||with-env env = || x₃ ||with-env (i<|| x₂ ||> env)
+∥_∥with-env_  : Exp → Env → Value
+∥ lambda y e ∥with-env env = Fn ( y , e , env)
+∥ x₂ ∙ x₃ ∥with-env env = (∥ x₂ ∥with-env env) ↓Fn (ρ env x₃)
+∥ var x₂ ∥with-env env = ρ env x₂
+∥ lEt x₂ iN x₃ ∥with-env env = ∥ x₃ ∥with-env (i<∥ x₂ ∥> env)
   where
-    i<||_||>_ : Heap → Env → Env
-    i<|| [] ||> env = env
-    i<|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (i<|| h ||> env)
+    i<∥_∥>_ : Heap → Env → Env
+    i<∥ [] ∥> env = env
+    i<∥ x₁ ∷ h ∥> env = ((fst x₁) , (∥ (snd x₁) ∥with-env env)) ∷ (i<∥ h ∥> env)
 
-<||_||>_ : Heap → Env → Env
-<|| [] ||> env = env
-<|| x₁ ∷ h ||> env = ((fst x₁) , (|| (snd x₁) ||with-env env)) ∷ (<|| h ||> env)
+<∥_∥>_ : Heap → Env → Env
+<∥ [] ∥> env = env
+<∥ x₁ ∷ h ∥> env = ((fst x₁) , (∥ (snd x₁) ∥with-env env)) ∷ (<∥ h ∥> env)
 
 eval : Value → Value
-eval (Fn (fst₁ , fst₂ , snd₁)) = Fn (fst₁ , fst₂ , snd₁)
-eval (((Fn (y , e' , env)) ↓Fn) x₂) = (λ v → || e' ||with-env ((y , v) ∷ env)) x₂
-eval (((x₁ ↓Fn) x₃ ↓Fn) x₂) = ((((eval x₁) ↓Fn) x₃ ↓Fn) x₂) 
+eval (Fn (v  , e , env)) = Fn (v , e , env)
+eval ((Fn (v  , e , env)) ↓Fn x₁) = ∥ e ∥with-env ((v , x₁) ∷ env)
+eval ((x ↓Fn x₂) ↓Fn x₁) = ((eval x ↓Fn x₂) ↓Fn x₁)
+eval (ρ x x₂ ↓Fn x₁) = (ρ x x₂ ↓Fn x₁)
+eval (ρ₀ ↓Fn x₁) = ρ₀
+eval (ρ [] x₁) = ρ₀
+eval (ρ ((xv , xl) ∷ x₂) x₁) = if (x₁ Var₌₌ x₁) then xl else (eval (ρ x₂ x₁))
+eval (ρ₀) = ρ₀
+-- postulate
+--   three+two : Exp
+--   five six : Exp
+--   U V X Y : Var
+--   U+one V+V : Exp
+--   P : ∀ {Γ Δ} → (Γ  ⊢ three+two) ⇓ (Δ ⊢ five)
 
-postulate
-  three+two : Exp
-  five six : Exp
-  U V X Y : Var
-  U+one V+V : Exp
-  P : ∀ {Γ Δ} → (Γ  ⊢ three+two) ⇓ (Δ ⊢ five)
+vx = (name 1)
+vy = (name 2)
+vz = (name 3)
+vw = (name 4) 
 
-uexp1 : UExp
-uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x ((uvar y) u∙ (uvar x))
+-- uexp1 : UExp
+-- uexp1 = ulet (y , (uvar z)) ∷ [] iN ulambda x ((uvar y) u∙ (uvar x))
 
-uexp2 : UExp
-uexp2 = (ulambda x (uvar x)) u∙ (uvar y)
+-- uexp2 : UExp
+-- uexp2 = (ulambda x (uvar x)) u∙ (uvar y)
 
 
-ex1 : Exp
-ex1 = fst (α-rename (starTransform uexp1) (0) [])
+-- ex1 : Exp
+-- ex1 = fst (α-rename (starTransform uexp1) (0) [])
 
 
-ex2 = hat ex1 with-regards-to ((x , var z) ∷ [])
+-- ex2 = hat ex1 with-regards-to ((x , var z) ∷ [])
 
 
-ex3 = fst (α-rename (starTransform uexp2) (0) [])
+-- ex3 = fst (α-rename (starTransform uexp2) (0) [])
 
-sem-ex3 = || ex3 ||with-env []
+-- sem-ex3 = ∥ ex3 ∥with-env []
 
-eval-ex3 = eval sem-ex3
+-- eval-ex3 = eval sem-ex3
 
 -- _≤ᵣ_ : {e : Env} → ρ 
 -- r1 ≤ᵣ r2 = ρ 
 
-theorem2 : {ρ : Env} {Γ Δ : Heap} {e z : Exp} → Γ ⊢ e ⇓ Δ ⊢ z → (|| e ||with-env (<|| Γ ||> ρ) ≡ || z ||with-env (<|| Δ ||> ρ)) -- ((<|| Γ ||> ρ) ≤ᵣ (<|| Δ ||> ρ))
-theorem2 = {!!}
+_ρ⊔_ : Env → List (Var × Value) → Env
+x ρ⊔ [] = x
+x ρ⊔ (x₁ ∷ x₂) = x₁ ∷ (x ρ⊔ x₂)
+
+postulate po1 : {ro : Env} {Γ Δ : Heap} {x y : Var} {e e' z : Exp} → (Fn (y , e' , (<∥ Δ ∥> ro))) ↓Fn (ρ (<∥ Γ ∥> ro) x) ≡ ∥ e' ∥with-env (ro ρ⊔ ( (y , (ρ ro x) ) ∷ []))
+
+-- po1 : {ro : Env} {Γ Δ : Heap} {x y : Var} {e e' z : Exp} → (Fn (y , e' , (<∥ Δ ∥> ro))) ↓Fn (ρ (<∥ Γ ∥> ro) x) ≡ ∥ e' ∥with-env (ro ρ⊔ ( (y , (ρ ro x) ) ∷ []))
+-- po1 {ro} {Γ} {Δ} {x} {y} {e} {e'} {z} with (Fn (y , e' , (<∥ Δ ∥> ro))) ↓Fn (ρ (<∥ Γ ∥> ro) x)
+-- ... | q = {!!}
+
+
+postulate po2 : {ro : Env} {Γ Δ : Heap} {x y : Var} {e e' z : Exp} → (∥ e' ∥with-env (ro ρ⊔ ( (y , (ρ ro x) ) ∷ []))) ≡ (∥ e' ⟦ x / y ⟧ ∥with-env (<∥ Δ ∥> ro))
+
+postulate po3 : {ro : Env} {Γ Δ : Heap} {x y : Var} {e e' z : Exp} → ((∥ e ∥with-env (<∥ Γ ∥> ro)) ↓Fn ρ (<∥ Γ ∥> ro) x) ≡ ((∥ e ∥with-env (<∥ Δ ∥> ro)) ↓Fn ρ (<∥ Δ ∥> ro) x)
+postulate po4 : {ro : Env} {Γ Δ : Heap} {x y : Var} {e e' z : Exp} → ((Fn (y , e' , (<∥ Δ ∥> ro))) ↓Fn ρ (<∥ Γ ∥> ro) x) ≡ ((Fn (y , e' , (<∥ Δ ∥> ro))) ↓Fn ρ (<∥ Δ ∥> ro) x)
+-- cong2 : ∀ {a b} {A : Set a} {B : Set b} (f : A → B) {x y} → x ≡ y → f x ≡ f y
+-- cong2 f refl = refl
+
+postulate EnvEq : {ro : Env} {Γ Δ : Heap} {e z : Exp} → Γ ⊢ e ⇓ Δ ⊢ z → <∥ Γ ∥> ro ≡ <∥ Δ ∥> ro
+
+
+theorem2 : {ρ : Env} {Γ Δ : Heap} {e z : Exp} →
+                                     Γ ⊢ e ⇓ Δ ⊢ z →
+           (∥ e ∥with-env (<∥ Γ ∥> ρ) ≡ ∥ z ∥with-env (<∥ Δ ∥> ρ))
+theorem2 lam-red = refl
+theorem2  {ro} {Γ} {θ} {_} {z} (app-red  {_} {_} {Δ} {x} {y} {e} {e'} {_} ps pe)
+           with theorem2 {ro} {_} pe
+... | pet2 with theorem2 {ro} {_} {_} {_} {_} ps
+... | ps1 with cong (\ w → w ↓Fn (ρ (<∥ Γ ∥> ro) x)) ps1
+... | ps2    with trans ps2 (po4 {ro} {Γ} {Δ} {x} {y} {e} {e'} {z})
+... | ps3   with cong eval ps3
+... | qqq = trans (trans ps2 (trans (po4 {ro} {Γ} {Δ} {x} {y} {e} {e'} {z}) {!!})) pet2
+-- ... | qq = trans (trans q (trans (po1 {ro} {Γ} {Δ} {x} {y} {e} {e'} {z} ) (po2 {ro} {Γ} {Δ} {x} {y} {e} {e'} {z}))) t2t2
+theorem2 (var-red x₁) = {!!}
+theorem2 {ro} {Γ} {Δ} {_} {z} (lEt-red x₁) with theorem2 {ro} x₁
+... | t = {!!}
+
+data ∃ (A : Set) (P : A → Set) : Set where
+  <_,_> : (a : A) → P a → ∃ A P
+
+-- theorem3 :  {ρ : Env} {Γ Δ : Heap} {e z : Exp} → ∥ e ∥with-env (<∥ Γ ∥> ρ₀) ≡ ρ₀ → ∃ Δ (z ∙ )
+-- theorem3 = ?
+
+postulate th4 :  {ρ : Env} {x : Var} {Γ Δ : Heap} {e z : Exp} {TT  : List (Var × Exp)} →
+             ( Γ extendedby TT ⊢ e ⇓ Δ ⊢ z) ≡ (Γ ⊢ e ⇓ Δ ⊢ z)
+
+theorem4 :  {ρ : Env} {x : Var} {Γ Δ : Heap} {e z : Exp} →
+                         Γ ⊢ e ⇓ Δ ⊢ z →
+            ((∥ e ∥with-env (<∥ Γ ∥> []) ≡ ρ₀) → ⊥)
+theorem4 (lam-red {Γ} {x} {e}) ()
+theorem4 (app-red x x₂) ()
+theorem4 (var-red x) ()
+theorem4 (lEt-red {Γ} {Δ} {e} {z} mexp) x₁ = {!!}
+
+postulate le' le : Exp
+postulate lΓ lΔ : Heap
+postulate lro : Env
+postulate lx ly : Var
