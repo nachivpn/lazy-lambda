@@ -8,8 +8,11 @@ H ⊢ C = H × C
 _∶_ : {A  B : Set} → A → B  → A ⊢ B
 _∶_ = (_,_)
 
-_∣_↦_∣ : {A B : Set} → List (A × B) → A → B → List (A × B)
-L ∣ a ↦ b ∣ = ( a , b ) ∷ L
+_↦_ : {A B : Set} → (a : A) → (b : B) → A × B
+a ↦ b = ( a , b )
+
+_∣_∣ : {A : Set} → List A → A → List A
+L ∣ x ∣ = x ∷ L
 
 x : Nat
 x = 1
@@ -23,4 +26,4 @@ z = 3
 
 infix 18 _∶_
 infix 21 _⊢_
-infix 21 _∣_↦_∣
+infix 21 _∣_∣
