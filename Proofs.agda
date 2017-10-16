@@ -34,12 +34,7 @@ postulate
       (var-red
         zero
         zero
-        (app-red
-          lam-red
-          (var-red
-            zero
-            zero
-            lam-red)))
+        id∙id⇓id)
       -- evaluating body of value of x
       (var-red
         zero
