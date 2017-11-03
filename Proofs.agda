@@ -45,3 +45,35 @@ postulate
           zero
           (suc {pr = n¬≡n+4} zero)
           lam-red)))
+
+𝕗 𝕩 𝕞 𝕟 𝕤 𝕫 : Term
+𝕗 = var f
+𝕩 = var x
+𝕞 = var m
+𝕟 = var n
+𝕤 = var s
+𝕫 = var z
+
+fix : Term
+fix = lam f (lam x (𝕗 ∙ 𝕩 ∙ 𝕩)) ∙ (lam x (𝕗 ∙ 𝕩 ∙ 𝕩))
+
+𝟘 : Term
+𝟘 = lam f (lam x 𝕩)
+
+𝟙 : Term
+𝟙 = lam f (lam x (𝕗 ∙ 𝕩))
+
+𝟚 : Term
+𝟚 = lam f (lam x (𝕗 ∙ 𝕗 ∙ 𝕩))
+
+plus : Term
+plus =
+  lam m (lam n (lam s (lam z
+    𝕞 ∙ 𝕤 ∙ (𝕟 ∙ 𝕤 ∙ 𝕫))))
+
+-- It is perhaps useful to add a + ⇓ rule?
+-- because plus 1 2 doesn't actually evaluate to 3 (that requires beta reduction)
+
+
+
+

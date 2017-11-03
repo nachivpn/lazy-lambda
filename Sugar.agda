@@ -23,6 +23,11 @@ y = 2
 z : Nat
 z = 3
 
+f m n s : Nat
+f = 4
+m = 5
+n = 6
+s = 7
 
 infix 18 _∶_
 infix 21 _⊢_

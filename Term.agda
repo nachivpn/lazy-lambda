@@ -8,6 +8,7 @@ open import Sugar
 Name = Nat
 Pointer = Nat
 
+infixr 20 _∙_
 data Term : Set where
   var : (x : Name) → Term
   _∙_ : (t u : Term) → Term 
